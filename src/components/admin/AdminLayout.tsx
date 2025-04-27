@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Newspaper, LogOut, Sync } from "lucide-react";
+import { Newspaper, LogOut, RefreshCw } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -72,7 +72,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             variant="outline"
             className="flex items-center justify-center w-full text-white hover:text-white hover:bg-brand-blue/20"
           >
-            <Sync className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
             Синхронізувати
           </Button>
           <Button
