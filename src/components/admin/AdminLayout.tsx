@@ -1,6 +1,8 @@
+
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Newspaper, LogOut } from "lucide-react";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -8,6 +10,7 @@ interface AdminLayoutProps {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
+  const { logout } = useAdminAuth();
 
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
@@ -33,13 +36,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </nav>
         </div>
         <div className="mt-auto p-6">
-          <Link
-            to="/"
-            className="flex items-center p-3 text-white/70 hover:text-white transition-colors"
+          <button
+            onClick={logout}
+            className="flex items-center p-3 text-white/70 hover:text-white transition-colors w-full"
           >
             <LogOut className="mr-3 h-5 w-5" />
             Вийти з панелі
-          </Link>
+          </button>
         </div>
       </div>
       <div className="flex-1 p-6">{children}</div>
