@@ -6,11 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { mockNewsArticles } from "@/services/mockData";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { NewsArticle } from "@/types";
 import { supabase, getPublicImageUrl } from "@/lib/supabase";
 import { v4 as uuidv4 } from 'uuid';
+
+// Функція для транслітерації кирилиці в латиницю
+function transliterate(text: string) {
+  const translitMap: {[key: string]: string} = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'є': 'ye',
+    'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'ї': 'yi', 'й': 'y', 'к': 'k',
+    'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's',
+    'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh',
+    'щ': 'sch', 'ь': '', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Є': 'Ye',
+    'Ж': 'Zh', 'З': 'Z', 'И': 'Y', 'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K',
+    'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S',
+    'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
+    'Щ': 'Sch', 'Ь': '', 'Ю': 'Yu', 'Я': 'Ya', 'ь': '', 'ъ': '', 'Ь': '', 'Ъ': '',
+    'ы': 'y', 'Ы': 'Y', 'э': 'e', 'Э': 'E'
+  };
+
+  return text.split('').map(char => translitMap[char] || char).join('');
+}
 
 const NewsForm = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,33 +62,36 @@ const NewsForm = () => {
           .single();
 
         if (error || !data) {
-          const foundArticle = mockNewsArticles.find((a) => a.id === id);
-          if (foundArticle) {
-            setArticle(foundArticle);
-            setImages(foundArticle.images || [foundArticle.image].filter(Boolean) as string[]);
-          }
-        } else {
-          // Handle schema differences by mapping fields
-          const articleData = {
-            id: data.id,
-            title: data.title,
-            content: data.content,
-            summary: data.summary,
-            author: data.author,
-            date: data.date,
-            // Map image data based on database schema
-            image: data.main_image || data.image_url || "/placeholder.svg",
-            images: data.images_urls || data.images || [],
-          };
-          
-          setArticle(articleData);
-          setImages(articleData.images.length > 0 ? articleData.images : [articleData.image].filter(Boolean) as string[]);
+          console.error("Помилка завантаження новини:", error);
+          toast({
+            title: "Помилка",
+            description: "Не вдалося завантажити новину для редагування",
+            variant: "destructive"
+          });
+          navigate("/admin/news");
+          return;
         }
+
+        // Handle schema differences by mapping fields
+        const articleData = {
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          summary: data.summary || '',
+          author: data.author || '',
+          date: data.date,
+          // Map image data based on database schema
+          image: data.main_image || data.image_url || "/placeholder.svg",
+          images: data.images_urls || data.images || [],
+        };
+        
+        setArticle(articleData);
+        setImages(articleData.images?.length > 0 ? articleData.images : [articleData.image].filter(Boolean) as string[]);
       };
 
       fetchArticle();
     }
-  }, [id, isEditing]);
+  }, [id, isEditing, navigate, toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -87,9 +108,15 @@ const NewsForm = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${i}-${file.name.replace(/\s+/g, '-')}`;
         
-        console.log("Uploading file:", fileName);
+        // Транслітеруємо імена файлів та замінюємо пробіли на дефіси
+        const originalName = file.name.replace(/\s+/g, '-');
+        const transliteratedName = transliterate(originalName);
+        
+        // Використовуємо UUID для унікальності
+        const fileName = `${uuidv4()}-${transliteratedName}`;
+        
+        console.log("Завантажую файл:", fileName);
         
         const { data, error } = await supabase
           .storage
@@ -100,7 +127,7 @@ const NewsForm = () => {
           });
           
         if (error) {
-          console.error("Error uploading image:", error);
+          console.error("Помилка завантаження зображення:", error);
           toast({
             title: "Помилка завантаження",
             description: `Не вдалося завантажити зображення: ${error.message}`,
@@ -109,14 +136,14 @@ const NewsForm = () => {
           continue; // Skip to next file if there's an error
         }
         
-        // Get the public URL
+        // Отримуємо публічний URL
         const { data: urlData } = supabase
           .storage
           .from('news')
           .getPublicUrl(data.path);
         
         const imageUrl = urlData?.publicUrl;
-        console.log("Image uploaded successfully:", imageUrl);
+        console.log("Зображення успішно завантажено:", imageUrl);
         
         if (imageUrl) {
           setImages(prev => [...prev, imageUrl]);
@@ -135,7 +162,7 @@ const NewsForm = () => {
         description: "Зображення було успішно завантажено.",
       });
     } catch (error: any) {
-      console.error("Error uploading image:", error);
+      console.error("Помилка завантаження зображення:", error);
       toast({
         title: "Помилка завантаження",
         description: `Не вдалося завантажити зображення: ${error.message || 'Спробуйте ще раз.'}`,
@@ -176,20 +203,30 @@ const NewsForm = () => {
     e.preventDefault();
     
     try {
-      // Adapt our data structure to match the database schema
+      // Перевірка на порожні поля
+      if (!article.title || !article.content || !article.summary) {
+        toast({
+          title: "Помилка збереження",
+          description: "Будь ласка, заповніть всі обов'язкові поля",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Адаптуємо нашу структуру даних до схеми бази даних
       const articleToSave = {
         id: isEditing ? article.id : `news-${Date.now()}`,
-        title: article.title,
+        title: article.title.trim(),
         content: article.content,
         summary: article.summary,
         author: article.author,
         date: new Date(article.date).toISOString(),
-        // Map to the correct column names in the database
+        // Відображення в правильні назви колонок в базі даних
         main_image: article.image,
         images_urls: images,
       };
       
-      console.log("Saving article:", articleToSave);
+      console.log("Збереження новини:", articleToSave);
       
       let result;
       if (isEditing) {
@@ -204,7 +241,7 @@ const NewsForm = () => {
       }
       
       if (result.error) {
-        console.error("Error saving to database:", result.error);
+        console.error("Помилка збереження у базі даних:", result.error);
         throw result.error;
       }
       
@@ -215,7 +252,7 @@ const NewsForm = () => {
       
       navigate("/admin/news");
     } catch (error: any) {
-      console.error("Error saving article:", error);
+      console.error("Помилка збереження новини:", error);
       toast({
         title: "Помилка збереження",
         description: `Не вдалося зберегти новину: ${error.message || 'Спробуйте ще раз.'}`,
@@ -259,7 +296,7 @@ const NewsForm = () => {
                   id="title"
                   name="title"
                   value={article.title}
-                  onChange={handleChange}
+                  onChange={(e) => setArticle(prev => ({ ...prev, title: e.target.value }))}
                   required
                 />
               </div>
@@ -270,7 +307,7 @@ const NewsForm = () => {
                   id="author"
                   name="author"
                   value={article.author}
-                  onChange={handleChange}
+                  onChange={(e) => setArticle(prev => ({ ...prev, author: e.target.value }))}
                   required
                 />
               </div>
