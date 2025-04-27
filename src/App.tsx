@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { AdminAuthProvider } from "@/context/AdminAuthContext";
 import ProtectedRoute from "@/components/admin/ProtectedRoute";
@@ -34,59 +34,57 @@ function App() {
       <TooltipProvider>
         <CartProvider>
           <AdminAuthProvider>
-            <Router>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/catalog" element={<Catalog />} />
-                <Route path="/catalog/:categoryId" element={<CategoryProducts />} />
-                <Route path="/product/:productId" element={<ProductDetail />} />
-                <Route path="/news" element={<News />} />
-                <Route path="/news/:id" element={<NewsDetails />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contacts" element={<Contacts />} />
-                <Route path="/where-to-buy" element={<WhereToBuy />} />
-                
-                {/* Admin Routes */}
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route
-                  path="/admin"
-                  element={
-                    <ProtectedRoute>
-                      <AdminDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/news"
-                  element={
-                    <ProtectedRoute>
-                      <NewsManagement />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/news/new"
-                  element={
-                    <ProtectedRoute>
-                      <NewsForm />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/news/edit/:id"
-                  element={
-                    <ProtectedRoute>
-                      <NewsForm />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* Catch-all Route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Router>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/catalog/:categoryId" element={<CategoryProducts />} />
+              <Route path="/product/:productId" element={<ProductDetail />} />
+              <Route path="/news" element={<News />} />
+              <Route path="/news/:id" element={<NewsDetails />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contacts" element={<Contacts />} />
+              <Route path="/where-to-buy" element={<WhereToBuy />} />
+              
+              {/* Admin Routes */}
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/news"
+                element={
+                  <ProtectedRoute>
+                    <NewsManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/news/new"
+                element={
+                  <ProtectedRoute>
+                    <NewsForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/news/edit/:id"
+                element={
+                  <ProtectedRoute>
+                    <NewsForm />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Catch-all Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
             <Toaster />
             <Sonner />
           </AdminAuthProvider>
