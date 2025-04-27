@@ -1,13 +1,14 @@
+
 import React, { useState, useEffect } from "react";
 import { Search, Loader2 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import NewsCard from "@/components/news/NewsCard";
-import { mockNewsArticles } from "@/services/mockData";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { NewsArticle } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/hooks/use-toast";
 
 const News = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,7 +22,7 @@ const News = () => {
   const fetchArticles = async () => {
     setIsLoading(true);
     try {
-      // Try to get articles from Supabase
+      // Отримуємо статті з Supabase
       const { data, error } = await supabase
         .from('news')
         .select('*')
@@ -32,7 +33,7 @@ const News = () => {
       }
 
       if (data && data.length > 0) {
-        // Map database columns to our frontend model
+        // Мапуємо колонки бази даних на нашу фронтенд модель
         const mappedArticles: NewsArticle[] = data.map(item => ({
           id: item.id,
           title: item.title,
@@ -40,19 +41,26 @@ const News = () => {
           summary: item.summary || '',
           author: item.author || '',
           date: item.date,
-          // Map the image fields correctly
           image: item.main_image || '/placeholder.svg',
           images: item.images_urls || [],
         }));
         setArticles(mappedArticles);
       } else {
-        // Fallback to mock data if Supabase returns empty
-        setArticles(mockNewsArticles);
+        // Якщо немає даних, показуємо порожній список
+        setArticles([]);
+        toast({
+          description: "Новин не знайдено",
+        });
       }
     } catch (error) {
-      console.error("Error fetching articles:", error);
-      // Fallback to mock data
-      setArticles(mockNewsArticles);
+      console.error("Помилка завантаження новин:", error);
+      // Показуємо порожній список при помилці
+      setArticles([]);
+      toast({
+        variant: "destructive",
+        title: "Помилка",
+        description: "Не вдалося завантажити новини",
+      });
     } finally {
       setIsLoading(false);
     }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Pencil, Trash2, Search, CalendarDays, Loader2 } from "lucide-react";
@@ -5,17 +6,28 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { mockNewsArticles } from "@/services/mockData";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { NewsArticle } from "@/types";
 import { format } from "date-fns";
 import { uk } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const NewsManagement = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [articleToDelete, setArticleToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -25,7 +37,7 @@ const NewsManagement = () => {
   const fetchArticles = async () => {
     setIsLoading(true);
     try {
-      // Try to get articles from Supabase
+      // Отримуємо статті з Supabase
       const { data, error } = await supabase
         .from('news')
         .select('*')
@@ -36,7 +48,7 @@ const NewsManagement = () => {
       }
 
       if (data && data.length > 0) {
-        // Map database columns to our frontend model
+        // Мапуємо колонки бази даних на нашу фронтенд модель
         const mappedArticles: NewsArticle[] = data.map(item => ({
           id: item.id,
           title: item.title,
@@ -50,16 +62,14 @@ const NewsManagement = () => {
         }));
         setArticles(mappedArticles);
       } else {
-        // Fallback to mock data if Supabase returns empty
-        setArticles(mockNewsArticles);
+        // Якщо немає даних, показуємо порожній список
+        setArticles([]);
       }
     } catch (error) {
-      console.error("Error fetching articles:", error);
-      // Fallback to mock data
-      setArticles(mockNewsArticles);
+      console.error("Помилка завантаження новин:", error);
       toast({
         title: "Помилка завантаження",
-        description: "Не вдалося завантажити новини. Використовуються тестові дані.",
+        description: "Не вдалося завантажити новини.",
         variant: "destructive"
       });
     } finally {
@@ -74,32 +84,44 @@ const NewsManagement = () => {
       article.author.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDeleteArticle = async (id: string) => {
+  const confirmDeleteArticle = (id: string) => {
+    setArticleToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteArticle = async () => {
+    if (!articleToDelete) return;
+    
     try {
-      // Delete from Supabase
+      // Видаляємо з Supabase
       const { error } = await supabase
         .from('news')
         .delete()
-        .eq('id', id);
+        .eq('id', articleToDelete);
 
       if (error) {
         throw error;
       }
 
-      // Update local state
-      setArticles(articles.filter((article) => article.id !== id));
+      // Оновлюємо локальний стан
+      setArticles(prevArticles => 
+        prevArticles.filter((article) => article.id !== articleToDelete)
+      );
       
       toast({
         title: "Новину видалено",
         description: "Новина була успішно видалена з системи",
       });
     } catch (error) {
-      console.error("Error deleting article:", error);
+      console.error("Помилка видалення новини:", error);
       toast({
         title: "Помилка видалення",
         description: "Не вдалося видалити новину. Спробуйте ще раз.",
         variant: "destructive"
       });
+    } finally {
+      setArticleToDelete(null);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -185,7 +207,7 @@ const NewsManagement = () => {
                           variant="outline"
                           size="sm"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteArticle(article.id)}
+                          onClick={() => confirmDeleteArticle(article.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -203,6 +225,26 @@ const NewsManagement = () => {
             </TableBody>
           </Table>
         </div>
+        
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Ви впевнені?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ця дія видалить новину назавжди. Цю дію неможливо скасувати.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Скасувати</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteArticle}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Видалити
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );
