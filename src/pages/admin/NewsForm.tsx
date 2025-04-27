@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Save, ArrowLeft, Upload, X, Plus, Star } from "lucide-react";
@@ -88,34 +87,46 @@ const NewsForm = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileExt = file.name.split('.').pop();
-        const fileName = `new img/${uuidv4()}.${fileExt}`;
-        const filePath = fileName;
+        const fileName = `${Date.now()}-${i}-${file.name.replace(/\s+/g, '-')}`;
         
-        console.log("Uploading file:", filePath);
+        console.log("Uploading file:", fileName);
         
         const { data, error } = await supabase
           .storage
           .from('news')
-          .upload(filePath, file, {
+          .upload(fileName, file, {
             cacheControl: '3600',
             upsert: true
           });
           
         if (error) {
           console.error("Error uploading image:", error);
-          throw error;
+          toast({
+            title: "Помилка завантаження",
+            description: `Не вдалося завантажити зображення: ${error.message}`,
+            variant: "destructive"
+          });
+          continue; // Skip to next file if there's an error
         }
         
-        const imageUrl = getPublicImageUrl(filePath);
+        // Get the public URL
+        const { data: urlData } = supabase
+          .storage
+          .from('news')
+          .getPublicUrl(data.path);
+        
+        const imageUrl = urlData?.publicUrl;
         console.log("Image uploaded successfully:", imageUrl);
         
-        setImages(prev => [...prev, imageUrl]);
-        
-        if (!article.image || article.image === "/placeholder.svg") {
-          setArticle(prev => ({
-            ...prev,
-            image: imageUrl
-          }));
+        if (imageUrl) {
+          setImages(prev => [...prev, imageUrl]);
+          
+          if (!article.image || article.image === "/placeholder.svg") {
+            setArticle(prev => ({
+              ...prev,
+              image: imageUrl
+            }));
+          }
         }
       }
       

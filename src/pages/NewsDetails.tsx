@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -54,12 +53,12 @@ const NewsDetails = () => {
           id: data.id,
           title: data.title,
           content: data.content,
-          summary: data.summary,
-          author: data.author,
+          summary: data.summary || '',
+          author: data.author || '',
           date: data.date,
           // Map the image fields correctly
-          image: data.main_image || data.image_url || "/placeholder.svg",
-          images: data.images_urls || data.images || [],
+          image: data.main_image || '/placeholder.svg',
+          images: data.images_urls || [],
         };
         setArticle(articleData);
       } else {

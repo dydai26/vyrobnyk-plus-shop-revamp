@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Pencil, Trash2, Search, CalendarDays, Loader2 } from "lucide-react";
@@ -42,12 +41,12 @@ const NewsManagement = () => {
           id: item.id,
           title: item.title,
           content: item.content,
-          summary: item.summary,
-          author: item.author,
+          summary: item.summary || '',
+          author: item.author || '',
           date: item.date,
           // Map the image fields correctly
-          image: item.main_image || item.image_url || "/placeholder.svg",
-          images: item.images_urls || item.images || [],
+          image: item.main_image || '/placeholder.svg',
+          images: item.images_urls || [],
         }));
         setArticles(mappedArticles);
       } else {

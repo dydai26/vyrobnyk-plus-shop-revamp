@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Search, Loader2 } from "lucide-react";
 import Header from "@/components/layout/Header";
@@ -33,7 +32,19 @@ const News = () => {
       }
 
       if (data && data.length > 0) {
-        setArticles(data);
+        // Map database columns to our frontend model
+        const mappedArticles: NewsArticle[] = data.map(item => ({
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          summary: item.summary || '',
+          author: item.author || '',
+          date: item.date,
+          // Map the image fields correctly
+          image: item.main_image || '/placeholder.svg',
+          images: item.images_urls || [],
+        }));
+        setArticles(mappedArticles);
       } else {
         // Fallback to mock data if Supabase returns empty
         setArticles(mockNewsArticles);
