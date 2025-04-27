@@ -1,8 +1,11 @@
 
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Newspaper, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Newspaper, LogOut, Sync } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import SupabaseSync from "@/services/supabaseSync";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -11,9 +14,36 @@ interface AdminLayoutProps {
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { logout } = useAdminAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/'); // Redirect to home page
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const stats = await SupabaseSync.syncNews();
+      toast({
+        title: "Синхронізація завершена",
+        description: `Завантажено: ${stats.uploaded}, Оновлено: ${stats.updated}, Видалено: ${stats.deleted}, Помилок: ${stats.errors}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Помилка синхронізації",
+        description: "Не вдалося синхронізувати дані з базою даних",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -35,14 +65,24 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </Link>
           </nav>
         </div>
-        <div className="mt-auto p-6">
-          <button
-            onClick={logout}
-            className="flex items-center p-3 text-white/70 hover:text-white transition-colors w-full"
+        <div className="mt-auto p-6 space-y-4">
+          <Button
+            onClick={handleSync}
+            disabled={isSyncing}
+            variant="outline"
+            className="flex items-center justify-center w-full text-white hover:text-white hover:bg-brand-blue/20"
           >
-            <LogOut className="mr-3 h-5 w-5" />
+            <Sync className={`mr-2 h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            Синхронізувати
+          </Button>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="flex items-center justify-center w-full text-white hover:text-white hover:bg-brand-blue/20"
+          >
+            <LogOut className="mr-2 h-5 w-5" />
             Вийти з панелі
-          </button>
+          </Button>
         </div>
       </div>
       <div className="flex-1 p-6">{children}</div>
