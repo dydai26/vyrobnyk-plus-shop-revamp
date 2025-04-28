@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Save, ArrowLeft, Upload, X, Plus, Star } from "lucide-react";
@@ -23,8 +24,11 @@ function transliterate(text: string) {
     'Ж': 'Zh', 'З': 'Z', 'И': 'Y', 'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K',
     'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S',
     'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
-    'Щ': 'Sch', 'Ь': '', 'Ю': 'Yu', 'Я': 'Ya', 'ь': '', 'ъ': '', 'Ь': '', 'Ъ': '',
-    'ы': 'y', 'Ы': 'Y', 'э': 'e', 'Э': 'E'
+    'Щ': 'Sch', 'Ю': 'Yu', 'Я': 'Ya',
+    // Видаляємо дублікати ключів 'ь', 'Ь', 'ъ', 'Ъ'
+    // і додаємо лише одну версію кожного
+    'ы': 'y', 'Ы': 'Y', 'э': 'e', 'Э': 'E',
+    'ъ': '', 'Ъ': ''
   };
 
   return text.split('').map(char => translitMap[char] || char).join('');
