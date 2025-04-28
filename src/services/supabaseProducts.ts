@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory } from "@/types";
 
@@ -40,6 +39,9 @@ export const transliterate = (text: string): string => {
 // Upload product image to Supabase storage
 export const uploadProductImage = async (file: File, fileName?: string): Promise<string | null> => {
   try {
+    // First, ensure the 'products' bucket exists
+    await createProductBucket();
+    
     // Generate unique file name with transliteration if not provided
     const originalName = fileName || file.name;
     const fileExtension = originalName.split('.').pop() || '';
@@ -68,6 +70,28 @@ export const uploadProductImage = async (file: File, fileName?: string): Promise
   }
 };
 
+// Create the products bucket if it doesn't exist
+export const createProductBucket = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.storage.createBucket('products', {
+      public: true,
+      fileSizeLimit: 10485760, // 10MB
+      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+    });
+    
+    // Ignore error if bucket already exists
+    if (error && !error.message.includes('already exists')) {
+      console.error('Error creating products storage bucket:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error creating products bucket:', error);
+    return false;
+  }
+};
+
 // Upload multiple product images
 export const uploadProductImages = async (files: File[]): Promise<string[]> => {
   const uploadedUrls: string[] = [];
@@ -90,7 +114,7 @@ export const deleteProductImage = async (path: string): Promise<boolean> => {
     // Extract the file path from the URL if it's a public URL
     let filePath = path;
     
-    // Check if it's a Supabase storage URL without accessing storageUrl property
+    // Check if it's a Supabase storage URL without accessing protected properties
     if (path.includes('storage.supabasecdn.com') || path.includes('.supabase.co/storage')) {
       // Extract filename from the full URL
       const urlParts = path.split('/');
@@ -117,38 +141,44 @@ export const deleteProductImage = async (path: string): Promise<boolean> => {
 export const createProductTables = async (): Promise<boolean> => {
   try {
     // Create products table
-    const { error: productsTableError } = await supabase.rpc('pgSQL', {
-      query: `
-        CREATE TABLE IF NOT EXISTS products (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT NOT NULL,
-          price NUMERIC NOT NULL,
-          image TEXT,
-          additional_images TEXT[],
-          category_id TEXT NOT NULL,
-          in_stock BOOLEAN DEFAULT true,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          details JSONB
-        );
-        
-        -- Enable Row Level Security
-        ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-        
-        -- Create policies for products table
-        DROP POLICY IF EXISTS "Allow read access for all" ON products;
-        CREATE POLICY "Allow read access for all" ON products FOR SELECT USING (true);
-        
-        DROP POLICY IF EXISTS "Allow insert for all" ON products;
-        CREATE POLICY "Allow insert for all" ON products FOR INSERT WITH CHECK (true);
-        
-        DROP POLICY IF EXISTS "Allow update for all" ON products;
-        CREATE POLICY "Allow update for all" ON products FOR UPDATE USING (true);
-        
-        DROP POLICY IF EXISTS "Allow delete for all" ON products;
-        CREATE POLICY "Allow delete for all" ON products FOR DELETE USING (true);
-      `
-    });
+    const { error: productsTableError } = await supabase
+      .from('products')
+      .select('id')
+      .limit(1)
+      .catch(async () => {
+        // If table doesn't exist, create it
+        const { error } = await supabase.query(`
+          CREATE TABLE IF NOT EXISTS products (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            price NUMERIC NOT NULL,
+            image TEXT,
+            additional_images TEXT[],
+            category_id TEXT NOT NULL,
+            in_stock BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            details JSONB
+          );
+          
+          -- Enable Row Level Security
+          ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+          
+          -- Create policies for products table
+          DROP POLICY IF EXISTS "Allow read access for all" ON products;
+          CREATE POLICY "Allow read access for all" ON products FOR SELECT USING (true);
+          
+          DROP POLICY IF EXISTS "Allow insert for all" ON products;
+          CREATE POLICY "Allow insert for all" ON products FOR INSERT WITH CHECK (true);
+          
+          DROP POLICY IF EXISTS "Allow update for all" ON products;
+          CREATE POLICY "Allow update for all" ON products FOR UPDATE USING (true);
+          
+          DROP POLICY IF EXISTS "Allow delete for all" ON products;
+          CREATE POLICY "Allow delete for all" ON products FOR DELETE USING (true);
+        `);
+        return { error };
+      });
     
     if (productsTableError) {
       console.error('Error creating products table:', productsTableError);
@@ -156,31 +186,37 @@ export const createProductTables = async (): Promise<boolean> => {
     }
     
     // Create categories table
-    const { error: categoriesTableError } = await supabase.rpc('pgSQL', {
-      query: `
-        CREATE TABLE IF NOT EXISTS product_categories (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          image TEXT
-        );
-        
-        -- Enable Row Level Security
-        ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
-        
-        -- Create policies for categories table
-        DROP POLICY IF EXISTS "Allow read access for all categories" ON product_categories;
-        CREATE POLICY "Allow read access for all categories" ON product_categories FOR SELECT USING (true);
-        
-        DROP POLICY IF EXISTS "Allow insert for all categories" ON product_categories;
-        CREATE POLICY "Allow insert for all categories" ON product_categories FOR INSERT WITH CHECK (true);
-        
-        DROP POLICY IF EXISTS "Allow update for all categories" ON product_categories;
-        CREATE POLICY "Allow update for all categories" ON product_categories FOR UPDATE USING (true);
-        
-        DROP POLICY IF EXISTS "Allow delete for all categories" ON product_categories;
-        CREATE POLICY "Allow delete for all categories" ON product_categories FOR DELETE USING (true);
-      `
-    });
+    const { error: categoriesTableError } = await supabase
+      .from('product_categories')
+      .select('id')
+      .limit(1)
+      .catch(async () => {
+        // If table doesn't exist, create it
+        const { error } = await supabase.query(`
+          CREATE TABLE IF NOT EXISTS product_categories (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            image TEXT
+          );
+          
+          -- Enable Row Level Security
+          ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
+          
+          -- Create policies for categories table
+          DROP POLICY IF EXISTS "Allow read access for all categories" ON product_categories;
+          CREATE POLICY "Allow read access for all categories" ON product_categories FOR SELECT USING (true);
+          
+          DROP POLICY IF EXISTS "Allow insert for all categories" ON product_categories;
+          CREATE POLICY "Allow insert for all categories" ON product_categories FOR INSERT WITH CHECK (true);
+          
+          DROP POLICY IF EXISTS "Allow update for all categories" ON product_categories;
+          CREATE POLICY "Allow update for all categories" ON product_categories FOR UPDATE USING (true);
+          
+          DROP POLICY IF EXISTS "Allow delete for all categories" ON product_categories;
+          CREATE POLICY "Allow delete for all categories" ON product_categories FOR DELETE USING (true);
+        `);
+        return { error };
+      });
     
     if (categoriesTableError) {
       console.error('Error creating product_categories table:', categoriesTableError);
@@ -188,15 +224,8 @@ export const createProductTables = async (): Promise<boolean> => {
     }
     
     // Create storage bucket for product images if it doesn't exist
-    const { error: bucketError } = await supabase.storage.createBucket('products', {
-      public: true,
-      fileSizeLimit: 10485760, // 10MB
-      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-    });
-    
-    // Ignore error if bucket already exists
-    if (bucketError && !bucketError.message.includes('already exists')) {
-      console.error('Error creating products storage bucket:', bucketError);
+    const bucketCreated = await createProductBucket();
+    if (!bucketCreated) {
       return false;
     }
     
