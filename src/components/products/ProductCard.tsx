@@ -4,14 +4,30 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { Product } from "@/types";
+import { useCart } from "@/context/CartContext";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ProductCardProps {
   product: Product;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+  const { addToCart } = useCart();
+  const { toast } = useToast();
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    addToCart(product, 1);
+    toast({
+      title: "Товар додано до кошика",
+      description: `${product.name} (1 шт.)`,
+    });
+  };
+
   return (
-    <div className="product-card">
+    <div className="product-card bg-white shadow-sm hover:shadow-md transition-shadow rounded-lg overflow-hidden">
       <Link to={`/product/${product.id}`}>
         <div className="relative aspect-square overflow-hidden">
           <img
@@ -30,7 +46,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <p className="text-sm text-gray-500 mt-1 line-clamp-2">{product.description}</p>
         <div className="flex items-center justify-between mt-4">
           <span className="text-lg font-bold">{product.price} ₴</span>
-          <Button size="sm" className="bg-brand-blue hover:bg-brand-lightBlue">
+          <Button 
+            size="sm" 
+            className="bg-brand-blue hover:bg-brand-lightBlue"
+            onClick={handleAddToCart}
+          >
             <ShoppingCart className="h-4 w-4 mr-1" /> Купити
           </Button>
         </div>

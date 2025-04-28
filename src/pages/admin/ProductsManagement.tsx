@@ -1,196 +1,244 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Search, 
-  ArrowUpDown 
-} from "lucide-react";
+
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { mockProducts, productCategories } from "@/services/mockData";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Edit, Trash2, MoreHorizontal, Package } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Product } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Product, ProductCategory } from "@/types";
+import { fetchProducts, fetchProductCategories, deleteProduct } from "@/services/supabaseProducts";
 
 const ProductsManagement = () => {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Filtered products based on search term
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getCategoryName(product.categoryId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Get category name from ID
-  function getCategoryName(categoryId: string): string {
-    const category = productCategories.find(cat => cat.id === categoryId);
-    return category ? category.name : "Невідома категорія";
-  }
-
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((product) => product.id !== id));
-    toast({
-      title: "Товар видалено",
-      description: "Товар був успішно видалений з системи",
-      variant: "destructive",
-    });
-  };
-
-  const toggleProductStatus = (id: string) => {
-    setProducts(
-      products.map((product) =>
-        product.id === id ? { ...product, inStock: !product.inStock } : product
-      )
-    );
-    
-    const product = products.find(p => p.id === id);
-    if (product) {
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts(),
+        fetchProductCategories()
+      ]);
+      
+      setProducts(productsData);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error("Error loading data:", error);
       toast({
-        title: `Статус оновлено`,
-        description: `Товар "${product.name}" тепер ${product.inStock ? 'не в наявності' : 'в наявності'}`,
+        title: "Помилка завантаження",
+        description: "Не вдалося завантажити дані",
+        variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Format price to Ukrainian currency
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('uk-UA', {
-      style: 'currency',
-      currency: 'UAH',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((cat) => cat.id === categoryId);
+    return category ? category.name : "Невідома категорія";
+  };
+
+  const handleAddProduct = () => {
+    navigate("/admin/products/new");
+  };
+
+  const handleEditProduct = (id: string) => {
+    navigate(`/admin/products/edit/${id}`);
+  };
+
+  const handleDeleteProduct = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+
+    try {
+      const success = await deleteProduct(productToDelete.id);
+      
+      if (success) {
+        // Update local state
+        setProducts(products.filter((p) => p.id !== productToDelete.id));
+        
+        toast({
+          title: "Товар видалено",
+          description: `Товар "${productToDelete.name}" успішно видалено`,
+        });
+      } else {
+        throw new Error("Не вдалося видалити товар");
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Помилка видалення",
+        description: "Не вдалося видалити товар",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    }
   };
 
   return (
     <AdminLayout>
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Управління товарами</h1>
-          <Button asChild>
-            <Link to="/admin/products/new">
-              <Plus className="h-4 w-4 mr-2" /> Додати товар
-            </Link>
-          </Button>
-        </div>
-
-        <div className="mb-6">
-          <div className="flex">
-            <Input
-              type="text"
-              placeholder="Пошук товарів..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="mr-2"
-            />
-            <Button>
-              <Search className="h-4 w-4 mr-2" /> Пошук
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Управління товарами</h1>
+          <div className="space-x-2">
+            <Button onClick={() => navigate("/admin/categories")}>
+              <Package className="mr-2 h-4 w-4" /> Категорії
+            </Button>
+            <Button onClick={handleAddProduct}>
+              <Plus className="mr-2 h-4 w-4" /> Додати товар
             </Button>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border overflow-hidden">
+        {/* Products Table */}
+        <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">ID</TableHead>
-                <TableHead className="min-w-[200px]">
-                  <div className="flex items-center">
-                    Назва <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </div>
-                </TableHead>
+                <TableHead style={{ width: "60px" }}>Зображення</TableHead>
+                <TableHead>Назва</TableHead>
                 <TableHead>Категорія</TableHead>
-                <TableHead className="text-right">Ціна</TableHead>
-                <TableHead>Наявність</TableHead>
-                <TableHead className="text-right">Дії</TableHead>
+                <TableHead>Ціна</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead style={{ width: "80px" }}></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.length > 0 ? (
-                filteredProducts.map((product) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <div className="flex justify-center items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-800"></div>
+                      <span className="ml-2">Завантаження...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : products.length > 0 ? (
+                products.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.id}</TableCell>
                     <TableCell>
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded bg-gray-100 mr-3 overflow-hidden flex-shrink-0">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="truncate max-w-[300px]">{product.name}</div>
+                      <div className="w-10 h-10 bg-gray-100 rounded overflow-hidden">
+                        <img
+                          src={product.image || "/placeholder.svg"}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     </TableCell>
+                    <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{getCategoryName(product.categoryId)}</TableCell>
-                    <TableCell className="text-right">{formatPrice(product.price)}</TableCell>
+                    <TableCell>{formatCurrency(product.price)}</TableCell>
                     <TableCell>
-                      {product.inStock ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="mr-1 h-3 w-3" /> В наявності
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <XCircle className="mr-1 h-3 w-3" /> Немає
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.inStock
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {product.inStock ? "В наявності" : "Немає в наявності"}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleProductStatus(product.id)}
-                        >
-                          {product.inStock ? (
-                            <XCircle className="h-4 w-4" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/admin/products/edit/${product.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleEditProduct(product.id)}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Редагувати
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleDeleteProduct(product)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Видалити
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8">
-                    <div className="text-gray-500">Товари не знайдено</div>
+                    Товарів поки немає. Натисніть "Додати товар", щоб створити перший товар.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
+
+        {/* Delete Product Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Ви впевнені?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ви дійсно хочете видалити товар "{productToDelete?.name}"?
+                Цю дію неможливо скасувати.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Скасувати</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={confirmDeleteProduct}
+              >
+                Видалити
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

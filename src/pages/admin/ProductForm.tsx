@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Save, ArrowLeft, Upload, Plus, Trash2 } from "lucide-react";
@@ -9,10 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockProducts, productCategories } from "@/services/mockData";
 import { useToast } from "@/components/ui/use-toast";
-import { Product, ProductDetails } from "@/types";
-import axios from 'axios';
+import { Product, ProductDetails, ProductCategory } from "@/types";
+import { 
+  fetchProductById, 
+  fetchProductCategories, 
+  saveProduct, 
+  uploadProductImage, 
+  uploadProductImages 
+} from "@/services/supabaseProducts";
 
 const ProductForm = () => {
   const { id } = useParams<{ id: string }>();
@@ -49,21 +55,50 @@ const ProductForm = () => {
   };
 
   const [product, setProduct] = useState<Product>(emptyProduct);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [mainImagePreview, setMainImagePreview] = useState<string>("");
   const [additionalImagePreviews, setAdditionalImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
+  // Load product data if editing
   useEffect(() => {
-    if (isEditing) {
-      const foundProduct = mockProducts.find((p) => p.id === id);
-      if (foundProduct) {
-        setProduct(foundProduct);
-        setMainImagePreview(foundProduct.image);
-        setAdditionalImagePreviews(foundProduct.additionalImages || []);
+    const loadData = async () => {
+      try {
+        // Load categories
+        const categoriesData = await fetchProductCategories();
+        setCategories(categoriesData);
+        
+        // Load product if editing
+        if (isEditing && id) {
+          const productData = await fetchProductById(id);
+          
+          if (productData) {
+            setProduct(productData);
+            setMainImagePreview(productData.image);
+            setAdditionalImagePreviews(productData.additionalImages || []);
+          } else {
+            toast({
+              title: "Помилка",
+              description: "Товар не знайдено",
+              variant: "destructive"
+            });
+            navigate("/admin/products");
+          }
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast({
+          title: "Помилка завантаження",
+          description: "Не вдалося завантажити дані",
+          variant: "destructive"
+        });
       }
-    }
-  }, [id, isEditing]);
+    };
+    
+    loadData();
+  }, [id, isEditing, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -120,27 +155,27 @@ const ProductForm = () => {
         };
         reader.readAsDataURL(file);
         
-        // Create form data to send to server
-        const formData = new FormData();
-        formData.append('image', file);
+        // Upload to Supabase
+        const uploadedUrl = await uploadProductImage(file);
         
-        // Upload to server
-        const response = await fetch('http://localhost:3000/api/upload/product', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await response.json();
-        
-        // Update product with the server path
-        setProduct((prev) => ({ 
-          ...prev, 
-          image: data.url 
-        }));
-        
-        toast({
-          title: "Зображення завантажено",
-          description: "Основне зображення товару успішно завантажено.",
-        });
+        if (uploadedUrl) {
+          // Update product with the server path
+          setProduct((prev) => ({ 
+            ...prev, 
+            image: uploadedUrl 
+          }));
+          
+          toast({
+            title: "Зображення завантажено",
+            description: "Основне зображення товару успішно завантажено.",
+          });
+        } else {
+          toast({
+            title: "Помилка завантаження",
+            description: "Не вдалося завантажити зображення. Спробуйте ще раз.",
+            variant: "destructive"
+          });
+        }
       } catch (error) {
         console.error("Error uploading image:", error);
         toast({
@@ -176,30 +211,29 @@ const ProductForm = () => {
           newPreviews.push(preview);
         }
         
-        // Create form data
-        const formData = new FormData();
-        fileArray.forEach(file => {
-          formData.append('images', file);
-        });
-        
-        // Upload to server
-        const response = await fetch('http://localhost:3000/api/upload/product/additional', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await response.json();
-        const serverUrls = data.urls;
-        
+        // Add local previews to state
         setAdditionalImagePreviews(prev => [...prev, ...newPreviews]);
-        setProduct(prev => ({
-          ...prev,
-          additionalImages: serverUrls
-        }));
         
-        toast({
-          title: "Зображення завантажені",
-          description: `${files.length} додаткових зображень успішно завантажено.`,
-        });
+        // Upload to Supabase
+        const uploadedUrls = await uploadProductImages(fileArray);
+        
+        if (uploadedUrls.length > 0) {
+          setProduct(prev => ({
+            ...prev,
+            additionalImages: [...(prev.additionalImages || []), ...uploadedUrls]
+          }));
+          
+          toast({
+            title: "Зображення завантажені",
+            description: `${uploadedUrls.length} додаткових зображень успішно завантажено.`,
+          });
+        } else {
+          toast({
+            title: "Помилка завантаження",
+            description: "Не вдалося завантажити додаткові зображення. Спробуйте ще раз.",
+            variant: "destructive"
+          });
+        }
       } catch (error) {
         console.error("Error uploading additional images:", error);
         toast({
@@ -225,27 +259,47 @@ const ProductForm = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Generate a random ID if not editing
-    if (!isEditing) {
-      const newId = `product-${Date.now()}`;
-      setProduct(prev => ({ ...prev, id: newId }));
+    // Validate required fields
+    if (!product.name || !product.description || product.price <= 0 || !product.categoryId) {
+      toast({
+        title: "Помилка валідації",
+        description: "Заповніть усі обов'язкові поля",
+        variant: "destructive"
+      });
+      return;
     }
     
-    // In a real application, this would send data to the server
-    // For now, we'll just show a success toast
+    setIsSaving(true);
     
-    toast({
-      title: isEditing ? "Товар оновлено" : "Товар створено",
-      description: `Товар "${product.name}" був успішно ${isEditing ? "оновлений" : "створений"}.`,
-    });
-    
-    // Update the mockProducts array in a real app
-    // Here we'd likely use a state management solution or API call
-    
-    navigate("/admin/products");
+    try {
+      // Save product to Supabase
+      const savedId = await saveProduct(product);
+      
+      if (savedId) {
+        toast({
+          title: isEditing ? "Товар оновлено" : "Товар створено",
+          description: `Товар "${product.name}" був успішно ${isEditing ? "оновлений" : "створений"}.`,
+        });
+        
+        navigate("/admin/products");
+      } else {
+        throw new Error("Не вдалося зберегти товар");
+      }
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast({
+        title: "Помилка збереження",
+        description: `Не вдалося ${isEditing ? "оновити" : "створити"} товар: ${
+          error instanceof Error ? error.message : "Невідома помилка"
+        }`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -297,7 +351,7 @@ const ProductForm = () => {
                         <SelectValue placeholder="Оберіть категорію" />
                       </SelectTrigger>
                       <SelectContent>
-                        {productCategories.map((category) => (
+                        {categories.map((category) => (
                           <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
@@ -565,8 +619,18 @@ const ProductForm = () => {
                         type="button"
                         onClick={() => additionalImagesInputRef.current?.click()}
                         className="w-full"
+                        disabled={isUploading}
                       >
-                        <Upload className="h-4 w-4 mr-2" /> Додати зображення
+                        {isUploading ? (
+                          <>
+                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                            Завантаження...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" /> Додати зображення
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -581,11 +645,21 @@ const ProductForm = () => {
               variant="outline"
               className="mr-2"
               onClick={() => navigate("/admin/products")}
+              disabled={isSaving}
             >
               Скасувати
             </Button>
-            <Button type="submit">
-              <Save className="h-4 w-4 mr-2" /> {isEditing ? "Оновити" : "Створити"} товар
+            <Button type="submit" disabled={isSaving || isUploading}>
+              {isSaving ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Збереження...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" /> {isEditing ? "Оновити" : "Створити"} товар
+                </>
+              )}
             </Button>
           </div>
         </form>
