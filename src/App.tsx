@@ -1,5 +1,5 @@
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import Index from "./pages/Index";
@@ -34,42 +34,40 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <LanguageProvider>
-          <CartProvider>
-            <AdminAuthProvider>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contacts" element={<Contacts />} />
-                <Route path="/where-to-buy" element={<WhereToBuy />} />
-                <Route path="/catalog" element={<Catalog />} />
-                <Route path="/catalog/:categoryId" element={<CategoryProducts />} />
-                <Route path="/product/:id" element={<ProductDetails />} />
-                <Route path="/news" element={<News />} />
-                <Route path="/news/:id" element={<NewsDetails />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/admin/login" element={<AdminLogin />} />
+      <LanguageProvider>
+        <CartProvider>
+          <AdminAuthProvider>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contacts" element={<Contacts />} />
+              <Route path="/where-to-buy" element={<WhereToBuy />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/catalog/:categoryId" element={<CategoryProducts />} />
+              <Route path="/product/:id" element={<ProductDetails />} />
+              <Route path="/news" element={<News />} />
+              <Route path="/news/:id" element={<NewsDetails />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
 
-                {/* Admin Routes */}
-                <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-                <Route path="/admin/news" element={<ProtectedRoute><NewsManagement /></ProtectedRoute>} />
-                <Route path="/admin/news/new" element={<ProtectedRoute><NewsForm /></ProtectedRoute>} />
-                <Route path="/admin/news/edit/:id" element={<ProtectedRoute><NewsForm /></ProtectedRoute>} />
-                <Route path="/admin/products" element={<ProtectedRoute><ProductsManagement /></ProtectedRoute>} />
-                <Route path="/admin/products/new" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
-                <Route path="/admin/products/edit/:id" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
-                <Route path="/admin/categories" element={<ProtectedRoute><CategoriesManagement /></ProtectedRoute>} />
+              {/* Admin Routes */}
+              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/news" element={<ProtectedRoute><NewsManagement /></ProtectedRoute>} />
+              <Route path="/admin/news/new" element={<ProtectedRoute><NewsForm /></ProtectedRoute>} />
+              <Route path="/admin/news/edit/:id" element={<ProtectedRoute><NewsForm /></ProtectedRoute>} />
+              <Route path="/admin/products" element={<ProtectedRoute><ProductsManagement /></ProtectedRoute>} />
+              <Route path="/admin/products/new" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
+              <Route path="/admin/products/edit/:id" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
+              <Route path="/admin/categories" element={<ProtectedRoute><CategoriesManagement /></ProtectedRoute>} />
 
-                {/* 404 Route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-            </AdminAuthProvider>
-          </CartProvider>
-        </LanguageProvider>
-      </BrowserRouter>
+              {/* 404 Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </AdminAuthProvider>
+        </CartProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }
