@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory } from "@/types";
 
@@ -141,86 +142,132 @@ export const deleteProductImage = async (path: string): Promise<boolean> => {
 export const createProductTables = async (): Promise<boolean> => {
   try {
     // Create products table
-    const { error: productsTableError } = await supabase
+    const { data: productsExist, error: productsCheckError } = await supabase
       .from('products')
       .select('id')
-      .limit(1)
-      .catch(async () => {
-        // If table doesn't exist, create it
-        const { error } = await supabase.query(`
-          CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT NOT NULL,
-            price NUMERIC NOT NULL,
-            image TEXT,
-            additional_images TEXT[],
-            category_id TEXT NOT NULL,
-            in_stock BOOLEAN DEFAULT true,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            details JSONB
-          );
-          
-          -- Enable Row Level Security
-          ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-          
-          -- Create policies for products table
-          DROP POLICY IF EXISTS "Allow read access for all" ON products;
-          CREATE POLICY "Allow read access for all" ON products FOR SELECT USING (true);
-          
-          DROP POLICY IF EXISTS "Allow insert for all" ON products;
-          CREATE POLICY "Allow insert for all" ON products FOR INSERT WITH CHECK (true);
-          
-          DROP POLICY IF EXISTS "Allow update for all" ON products;
-          CREATE POLICY "Allow update for all" ON products FOR UPDATE USING (true);
-          
-          DROP POLICY IF EXISTS "Allow delete for all" ON products;
-          CREATE POLICY "Allow delete for all" ON products FOR DELETE USING (true);
-        `);
-        return { error };
-      });
+      .limit(1);
     
-    if (productsTableError) {
-      console.error('Error creating products table:', productsTableError);
-      return false;
+    if (productsCheckError || !productsExist || productsExist.length === 0) {
+      // Table doesn't exist or is empty, create it using RPC
+      const { error: createTableError } = await supabase.rpc('create_products_table', {});
+      
+      if (createTableError) {
+        // If RPC doesn't exist, fall back to creating the function first
+        const createTableSql = `
+          CREATE OR REPLACE FUNCTION create_products_table()
+          RETURNS void AS $$
+          BEGIN
+            CREATE TABLE IF NOT EXISTS products (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              description TEXT NOT NULL,
+              price NUMERIC NOT NULL,
+              image TEXT,
+              additional_images TEXT[],
+              category_id TEXT NOT NULL,
+              in_stock BOOLEAN DEFAULT true,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              details JSONB
+            );
+            
+            -- Enable Row Level Security
+            ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+            
+            -- Create policies for products table
+            DROP POLICY IF EXISTS "Allow read access for all" ON products;
+            CREATE POLICY "Allow read access for all" ON products FOR SELECT USING (true);
+            
+            DROP POLICY IF EXISTS "Allow insert for all" ON products;
+            CREATE POLICY "Allow insert for all" ON products FOR INSERT WITH CHECK (true);
+            
+            DROP POLICY IF EXISTS "Allow update for all" ON products;
+            CREATE POLICY "Allow update for all" ON products FOR UPDATE USING (true);
+            
+            DROP POLICY IF EXISTS "Allow delete for all" ON products;
+            CREATE POLICY "Allow delete for all" ON products FOR DELETE USING (true);
+          END;
+          $$ LANGUAGE plpgsql;
+        `;
+        
+        // Create the function and run it
+        const { error: createFunctionError } = await supabase.functions.invoke('run-sql', {
+          body: { sql: createTableSql }
+        });
+        
+        if (createFunctionError) {
+          console.error('Error creating products table function:', createFunctionError);
+          return false;
+        }
+        
+        // Execute the function
+        const { error: runFunctionError } = await supabase.rpc('create_products_table', {});
+        
+        if (runFunctionError) {
+          console.error('Error creating products table:', runFunctionError);
+          return false;
+        }
+      }
     }
     
     // Create categories table
-    const { error: categoriesTableError } = await supabase
+    const { data: categoriesExist, error: categoriesCheckError } = await supabase
       .from('product_categories')
       .select('id')
-      .limit(1)
-      .catch(async () => {
-        // If table doesn't exist, create it
-        const { error } = await supabase.query(`
-          CREATE TABLE IF NOT EXISTS product_categories (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            image TEXT
-          );
-          
-          -- Enable Row Level Security
-          ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
-          
-          -- Create policies for categories table
-          DROP POLICY IF EXISTS "Allow read access for all categories" ON product_categories;
-          CREATE POLICY "Allow read access for all categories" ON product_categories FOR SELECT USING (true);
-          
-          DROP POLICY IF EXISTS "Allow insert for all categories" ON product_categories;
-          CREATE POLICY "Allow insert for all categories" ON product_categories FOR INSERT WITH CHECK (true);
-          
-          DROP POLICY IF EXISTS "Allow update for all categories" ON product_categories;
-          CREATE POLICY "Allow update for all categories" ON product_categories FOR UPDATE USING (true);
-          
-          DROP POLICY IF EXISTS "Allow delete for all categories" ON product_categories;
-          CREATE POLICY "Allow delete for all categories" ON product_categories FOR DELETE USING (true);
-        `);
-        return { error };
-      });
+      .limit(1);
     
-    if (categoriesTableError) {
-      console.error('Error creating product_categories table:', categoriesTableError);
-      return false;
+    if (categoriesCheckError || !categoriesExist || categoriesExist.length === 0) {
+      // Table doesn't exist or is empty, create it using RPC
+      const { error: createTableError } = await supabase.rpc('create_categories_table', {});
+      
+      if (createTableError) {
+        // If RPC doesn't exist, fall back to creating the function first
+        const createCategoriesTableSql = `
+          CREATE OR REPLACE FUNCTION create_categories_table()
+          RETURNS void AS $$
+          BEGIN
+            CREATE TABLE IF NOT EXISTS product_categories (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              image TEXT
+            );
+            
+            -- Enable Row Level Security
+            ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
+            
+            -- Create policies for categories table
+            DROP POLICY IF EXISTS "Allow read access for all categories" ON product_categories;
+            CREATE POLICY "Allow read access for all categories" ON product_categories FOR SELECT USING (true);
+            
+            DROP POLICY IF EXISTS "Allow insert for all categories" ON product_categories;
+            CREATE POLICY "Allow insert for all categories" ON product_categories FOR INSERT WITH CHECK (true);
+            
+            DROP POLICY IF EXISTS "Allow update for all categories" ON product_categories;
+            CREATE POLICY "Allow update for all categories" ON product_categories FOR UPDATE USING (true);
+            
+            DROP POLICY IF EXISTS "Allow delete for all categories" ON product_categories;
+            CREATE POLICY "Allow delete for all categories" ON product_categories FOR DELETE USING (true);
+          END;
+          $$ LANGUAGE plpgsql;
+        `;
+        
+        // Create the function and run it
+        const { error: createFunctionError } = await supabase.functions.invoke('run-sql', {
+          body: { sql: createCategoriesTableSql }
+        });
+        
+        if (createFunctionError) {
+          console.error('Error creating categories table function:', createFunctionError);
+          return false;
+        }
+        
+        // Execute the function
+        const { error: runFunctionError } = await supabase.rpc('create_categories_table', {});
+        
+        if (runFunctionError) {
+          console.error('Error creating categories table:', runFunctionError);
+          return false;
+        }
+      }
     }
     
     // Create storage bucket for product images if it doesn't exist
