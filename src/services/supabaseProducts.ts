@@ -89,9 +89,9 @@ export const deleteProductImage = async (path: string): Promise<boolean> => {
   try {
     // Extract the file path from the URL if it's a public URL
     let filePath = path;
-    const storageUrl = supabase.storageUrl;
     
-    if (path.includes(storageUrl)) {
+    // Check if it's a Supabase storage URL without accessing storageUrl property
+    if (path.includes('storage.supabasecdn.com') || path.includes('.supabase.co/storage')) {
       // Extract filename from the full URL
       const urlParts = path.split('/');
       filePath = urlParts[urlParts.length - 1];
